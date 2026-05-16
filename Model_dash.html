@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RBI LoanSense AI — Model Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ═══════════════════════════════════════════════════
+   DESIGN SYSTEM — matches RBI LoanSense predictor
+═══════════════════════════════════════════════════ */
+:root {
+  --bg:       #040d1a;
+  --bg2:      #071224;
+  --bg3:      #0b1a30;
+  --panel:    #0e2040;
+  --border:   #1a3358;
+  --gold:     #f0a500;
+  --gold-dim: #c47f00;
+  --cyan:     #00d4ff;
+  --green:    #00e5a0;
+  --red:      #ff4d6d;
+  --purple:   #a855f7;
+  --text:     #e8eef7;
+  --muted:    #6b8aaa;
+  --font:     'Sora', sans-serif;
+  --mono:     'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grid texture */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* Glow blobs */
+.blob { position: fixed; border-radius: 50%; filter: blur(140px); opacity: .15; pointer-events: none; z-index: 0; }
+.blob-1 { width:550px; height:550px; background:var(--gold);  top:-180px; left:-120px; }
+.blob-2 { width:450px; height:450px; background:var(--cyan);  bottom:-120px; right:-100px; }
+.blob-3 { width:320px; height:320px; background:var(--green); top:45%; left:42%; }
+
+/* ═══════════ NAV ═══════════ */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(4,13,26,.88);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px;
+}
+.nav-brand { display: flex; align-items: center; gap: .75rem; }
+.nav-logo {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--gold), var(--cyan));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; font-weight: 900; color: #000;
+}
+.nav-title { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; }
+.nav-title span { color: var(--gold); }
+.nav-subtitle { font-size: .7rem; color: var(--muted); font-family: var(--mono); }
+
+.nav-right { display: flex; align-items: center; gap: 1rem; }
+.chip {
+  padding: .28rem .72rem; border-radius: 20px;
+  font-size: .68rem; font-weight: 700;
+  letter-spacing: .05em; font-family: var(--mono);
+}
+.chip-green { background: rgba(0,229,160,.12); color: var(--green); border: 1px solid rgba(0,229,160,.25); }
+.chip-gold  { background: rgba(240,165,0,.12);  color: var(--gold);  border: 1px solid rgba(240,165,0,.25); }
+.chip-cyan  { background: rgba(0,212,255,.12);  color: var(--cyan);  border: 1px solid rgba(0,212,255,.25); }
+
+/* ═══════════ HERO STAT BAR ═══════════ */
+.hero-bar {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  gap: 1px; background: var(--border);
+  border-bottom: 1px solid var(--border);
+  position: relative; z-index: 1;
+}
+.hero-stat {
+  background: var(--bg2);
+  padding: 1.1rem 1.25rem;
+  display: flex; flex-direction: column; gap: .25rem;
+  position: relative; overflow: hidden;
+  transition: background .2s;
+}
+.hero-stat:hover { background: var(--bg3); }
+.hero-stat::after {
+  content: ''; position: absolute;
+  bottom: 0; left: 0; right: 0; height: 2px;
+}
+.hs-gold::after   { background: var(--gold); }
+.hs-green::after  { background: var(--green); }
+.hs-cyan::after   { background: var(--cyan); }
+.hs-red::after    { background: var(--red); }
+.hs-purple::after { background: var(--purple); }
+.hs-muted::after  { background: var(--muted); }
+
+.hero-label { font-size: .63rem; font-weight: 700; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.hero-value { font-size: 1.6rem; font-weight: 800; font-family: var(--mono); line-height: 1.1; }
+.hs-gold   .hero-value { color: var(--gold); }
+.hs-green  .hero-value { color: var(--green); }
+.hs-cyan   .hero-value { color: var(--cyan); }
+.hs-red    .hero-value { color: var(--red); }
+.hs-purple .hero-value { color: var(--purple); }
+.hs-muted  .hero-value { color: var(--muted); }
+.hero-note { font-size: .65rem; color: var(--muted); font-family: var(--mono); }
+
+/* ═══════════ SECTION TOOLBAR ═══════════ */
+.section-bar {
+  position: relative; z-index: 1;
+  padding: 1.2rem 2rem .8rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.section-heading { font-size: 1.15rem; font-weight: 800; }
+.section-heading span { color: var(--gold); }
+.section-sub { font-size: .75rem; color: var(--muted); margin-top: .15rem; }
+.filter-row { display: flex; gap: .5rem; }
+.filter-btn {
+  padding: .35rem .85rem; border-radius: 20px; border: 1px solid var(--border);
+  background: transparent; color: var(--muted);
+  font-family: var(--font); font-size: .75rem; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.filter-btn.active, .filter-btn:hover {
+  background: rgba(240,165,0,.12); color: var(--gold); border-color: rgba(240,165,0,.35);
+}
+
+/* ═══════════ CHART GRID ═══════════ */
+.charts-wrapper {
+  position: relative; z-index: 1;
+  padding: 0 2rem 2.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.4rem;
+}
+.chart-card {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 1.5rem 1.5rem 1.25rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .25s, box-shadow .25s;
+}
+.chart-card:hover {
+  border-color: rgba(240,165,0,.3);
+  box-shadow: 0 8px 40px rgba(0,0,0,.4);
+}
+.chart-card.full-width { grid-column: 1 / -1; }
+
+/* Glow accent on hover */
+.chart-card::before {
+  content: ''; position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  opacity: 0; transition: opacity .3s;
+}
+.chart-card:hover::before { opacity: 1; }
+.card-gold::before  { background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+.card-cyan::before  { background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+.card-green::before { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+.card-red::before   { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+.card-purple::before{ background: linear-gradient(90deg, transparent, var(--purple), transparent); }
+
+/* Card header */
+.card-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.1rem;
+}
+.card-icon {
+  width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; margin-right: .75rem;
+}
+.card-icon-gold   { background: rgba(240,165,0,.18); }
+.card-icon-cyan   { background: rgba(0,212,255,.18); }
+.card-icon-green  { background: rgba(0,229,160,.18); }
+.card-icon-red    { background: rgba(255,77,109,.18); }
+.card-icon-purple { background: rgba(168,85,247,.18); }
+
+.card-title-area { display: flex; align-items: center; gap: .75rem; }
+.card-title { font-size: .9rem; font-weight: 700; }
+.card-sub   { font-size: .7rem; color: var(--muted); margin-top: .12rem; }
+
+.card-badge {
+  font-size: .68rem; font-family: var(--mono); font-weight: 700;
+  padding: .22rem .6rem; border-radius: 20px; flex-shrink: 0;
+}
+.badge-gold   { background: rgba(240,165,0,.14); color: var(--gold); }
+.badge-green  { background: rgba(0,229,160,.14); color: var(--green); }
+.badge-cyan   { background: rgba(0,212,255,.14); color: var(--cyan); }
+.badge-red    { background: rgba(255,77,109,.14); color: var(--red); }
+.badge-purple { background: rgba(168,85,247,.14); color: var(--purple); }
+
+/* Canvas wrapper */
+.canvas-wrap { position: relative; width: 100%; }
+
+/* ═══════════ CONFUSION MATRIX ═══════════ */
+.cm-wrapper {
+  display: flex; flex-direction: column; align-items: center; gap: 1.2rem;
+  padding: .5rem 0;
+}
+.cm-table-area {
+  display: flex; gap: 1rem; align-items: center;
+}
+.cm-axis-label {
+  font-size: .72rem; font-weight: 700; color: var(--muted);
+  letter-spacing: .1em; text-transform: uppercase;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  transform: rotate(180deg);
+}
+.cm-inner { display: flex; flex-direction: column; gap: 0; }
+.cm-col-labels {
+  display: flex; padding-left: 108px; margin-bottom: 6px;
+}
+.cm-col-label {
+  flex: 1; text-align: center;
+  font-size: .7rem; font-weight: 700; color: var(--muted);
+  letter-spacing: .07em; text-transform: uppercase;
+}
+.cm-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.cm-row-label {
+  width: 100px; text-align: right;
+  font-size: .7rem; font-weight: 700; color: var(--muted);
+  letter-spacing: .07em; text-transform: uppercase;
+  padding-right: 8px;
+}
+.cm-cell {
+  flex: 1; height: 90px; border-radius: 12px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  border: 1px solid transparent;
+  position: relative; overflow: hidden;
+  cursor: default;
+  transition: transform .2s, box-shadow .2s;
+}
+.cm-cell:hover { transform: scale(1.02); }
+
+.cm-cell.tn {
+  background: rgba(0,229,160,.12);
+  border-color: rgba(0,229,160,.25);
+}
+.cm-cell.tp {
+  background: rgba(0,229,160,.12);
+  border-color: rgba(0,229,160,.25);
+}
+.cm-cell.fp {
+  background: rgba(255,77,109,.1);
+  border-color: rgba(255,77,109,.2);
+}
+.cm-cell.fn {
+  background: rgba(255,77,109,.1);
+  border-color: rgba(255,77,109,.2);
+}
+.cm-cell-count {
+  font-size: 1.6rem; font-weight: 800; font-family: var(--mono);
+  line-height: 1;
+}
+.cm-cell.tn .cm-cell-count,
+.cm-cell.tp .cm-cell-count { color: var(--green); }
+.cm-cell.fp .cm-cell-count,
+.cm-cell.fn .cm-cell-count { color: var(--red); }
+
+.cm-cell-label {
+  font-size: .62rem; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+}
+.cm-cell.tn .cm-cell-label { color: rgba(0,229,160,.7); }
+.cm-cell.tp .cm-cell-label { color: rgba(0,229,160,.7); }
+.cm-cell.fp .cm-cell-label { color: rgba(255,77,109,.7); }
+.cm-cell.fn .cm-cell-label { color: rgba(255,77,109,.7); }
+
+.cm-cell-pct {
+  position: absolute; bottom: 5px; right: 7px;
+  font-size: .6rem; font-family: var(--mono); font-weight: 700;
+  color: rgba(255,255,255,.35);
+}
+
+.cm-predicted-label {
+  font-size: .72rem; font-weight: 700; color: var(--muted);
+  letter-spacing: .1em; text-transform: uppercase;
+  text-align: center; margin-top: .3rem;
+}
+
+/* KPI row under confusion matrix */
+.cm-kpi-row {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: .75rem; width: 100%;
+}
+.cm-kpi {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: .75rem;
+  text-align: center;
+}
+.cm-kpi-val { font-size: 1.1rem; font-weight: 800; font-family: var(--mono); }
+.cm-kpi-lbl { font-size: .62rem; color: var(--muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin-top: .2rem; }
+
+/* ═══════════ LEGEND ═══════════ */
+.legend-row {
+  display: flex; gap: 1.2rem; flex-wrap: wrap;
+  margin-top: .75rem;
+}
+.legend-item {
+  display: flex; align-items: center; gap: .45rem;
+  font-size: .72rem; color: var(--muted); font-weight: 500;
+}
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.legend-line { width: 18px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+.legend-dash { width: 18px; height: 0px; border-top: 2px dashed; flex-shrink: 0; }
+
+/* ═══════════ ANNOTATION BADGES ═══════════ */
+.annotation {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .7rem; font-family: var(--mono); font-weight: 700;
+  padding: .22rem .6rem; border-radius: 8px;
+  border: 1px solid;
+}
+.ann-gold   { background: rgba(240,165,0,.1);  color: var(--gold);  border-color: rgba(240,165,0,.3); }
+.ann-green  { background: rgba(0,229,160,.1);  color: var(--green); border-color: rgba(0,229,160,.3); }
+.ann-cyan   { background: rgba(0,212,255,.1);  color: var(--cyan);  border-color: rgba(0,212,255,.3); }
+
+/* ═══════════ FOOTER RIBBON ═══════════ */
+.footer-ribbon {
+  position: relative; z-index: 1;
+  background: var(--bg2); border-top: 1px solid var(--border);
+  padding: 1rem 2rem;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.footer-left { font-size: .72rem; color: var(--muted); }
+.footer-left strong { color: var(--text); }
+.footer-badges { display: flex; gap: .5rem; }
+
+/* ═══════════ COUNTER ANIMATION ═══════════ */
+.count-up { transition: all .5s; }
+
+/* ═══════════ EXPAND BUTTON ═══════════ */
+.expand-btn {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--muted); border-radius: 8px; padding: .28rem .6rem;
+  font-size: .68rem; font-family: var(--mono); cursor: pointer;
+  transition: all .2s;
+}
+.expand-btn:hover { background: rgba(240,165,0,.1); color: var(--gold); border-color: rgba(240,165,0,.3); }
+
+/* ═══════════ SCROLLBAR ═══════════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Background blobs -->
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<!-- ═══════════════════════════════════════════
+     NAV
+═══════════════════════════════════════════ -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">₹</div>
+    <div>
+      <div class="nav-title">RBI <span>LoanSense</span> AI</div>
+      <div class="nav-subtitle">Model Evaluation Dashboard</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <span class="chip chip-gold">Stacking Ensemble</span>
+    <span class="chip chip-green">96.52% Accuracy</span>
+    <span class="chip chip-cyan">n = 10,000 Test Records</span>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════
+     HERO STAT BAR — 6 KEY METRICS
+═══════════════════════════════════════════ -->
+<div class="hero-bar">
+  <div class="hero-stat hs-gold">
+    <span class="hero-label">Accuracy</span>
+    <span class="hero-value">96.52%</span>
+    <span class="hero-note">9,652 / 10,000 correct</span>
+  </div>
+  <div class="hero-stat hs-cyan">
+    <span class="hero-label">ROC-AUC</span>
+    <span class="hero-value">99.56%</span>
+    <span class="hero-note">Near-perfect discrimination</span>
+  </div>
+  <div class="hero-stat hs-green">
+    <span class="hero-label">KS Statistic</span>
+    <span class="hero-value">0.87</span>
+    <span class="hero-note">Beats CIBIL bureau (0.75)</span>
+  </div>
+  <div class="hero-stat hs-red">
+    <span class="hero-label">F1 — Approved</span>
+    <span class="hero-value">0.94</span>
+    <span class="hero-note">Minority class (27.6%)</span>
+  </div>
+  <div class="hero-stat hs-purple">
+    <span class="hero-label">5-Fold CV</span>
+    <span class="hero-value">96.41%</span>
+    <span class="hero-note">±0.10% — no overfitting</span>
+  </div>
+  <div class="hero-stat hs-muted">
+    <span class="hero-label">KS p-value</span>
+    <span class="hero-value">&lt;0.001</span>
+    <span class="hero-note">Highly significant</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SECTION TOOLBAR
+═══════════════════════════════════════════ -->
+<div class="section-bar">
+  <div>
+    <div class="section-heading">Model <span>Evaluation</span> Suite</div>
+    <div class="section-sub">Six interactive charts · Stacking Ensemble · IOB + Union Bank of India, Nuzvid field data</div>
+  </div>
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="highlightAll(this)">All Charts</button>
+    <button class="filter-btn" onclick="highlightCurves(this)">Curves</button>
+    <button class="filter-btn" onclick="highlightBars(this)">Bar Charts</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     6-CHART GRID
+═══════════════════════════════════════════ -->
+<div class="charts-wrapper" id="chartsWrapper">
+
+  <!-- ── 1. ROC CURVE ─────────────────────────────── -->
+  <div class="chart-card card-cyan" id="card-roc">
+    <div class="card-header">
+      <div class="card-title-area">
+        <div class="card-icon card-icon-cyan">📈</div>
+        <div>
+          <div class="card-title">ROC Curve</div>
+          <div class="card-sub">Receiver Operating Characteristic · Test set</div>
+        </div>
+      </div>
+      <span class="card-badge badge-cyan">AUC 99.56%</span>
+    </div>
+    <div class="canvas-wrap" style="height:280px">
+      <canvas id="rocChart"></canvas>
+    </div>
+    <div class="legend-row" style="margin-top:.85rem">
+      <div class="legend-item"><span class="legend-line" style="background:var(--cyan)"></span> Stacking Ensemble</div>
+      <div class="legend-item"><span class="legend-dash" style="border-color:var(--muted)"></span> Random Chance</div>
+      <div style="margin-left:auto"><span class="annotation ann-cyan">AUC = 99.56%</span></div>
+    </div>
+  </div>
+
+  <!-- ── 2. KS CDF SEPARATION ─────────────────────── -->
+  <div class="chart-card card-green" id="card-ks">
+    <div class="card-header">
+      <div class="card-title-area">
+        <div class="card-icon card-icon-green">〰️</div>
+        <div>
+          <div class="card-title">KS Statistic — CDF Separation</div>
+          <div class="card-sub">Kolmogorov-Smirnov · Optimal threshold</div>
+        </div>
+      </div>
+      <span class="card-badge badge-green">KS = 0.87</span>
+    </div>
+    <div class="canvas-wrap" style="height:280px">
+      <canvas id="ksChart"></canvas>
+    </div>
+    <div class="legend-row" style="margin-top:.85rem">
+      <div class="legend-item"><span class="legend-line" style="background:var(--red)"></span> Rejected CDF</div>
+      <div class="legend-item"><span class="legend-line" style="background:var(--green)"></span> Approved CDF</div>
+      <div class="legend-item"><span class="legend-dash" style="border-color:var(--gold)"></span> Optimal threshold ≈ 0.20</div>
+    </div>
+  </div>
+
+  <!-- ── 3. CONFUSION MATRIX ──────────────────────── -->
+  <div class="chart-card card-gold" id="card-cm">
+    <div class="card-header">
+      <div class="card-title-area">
+        <div class="card-icon card-icon-gold">🔲</div>
+        <div>
+          <div class="card-title">Confusion Matrix</div>
+          <div class="card-sub">10,000 test records · 27.6% positive class</div>
+        </div>
+      </div>
+      <span class="card-badge badge-gold">n = 10,000</span>
+    </div>
+
+    <!-- Custom HTML confusion matrix -->
+    <div class="cm-wrapper">
+      <div class="cm-table-area">
+        <div class="cm-axis-label">Actual Label</div>
+        <div class="cm-inner">
+          <div style="display:flex; padding-left:108px; margin-bottom:6px;">
+            <div class="cm-col-label">Rejected</div>
+            <div class="cm-col-label">Approved</div>
+          </div>
+          <div class="cm-row">
+            <div class="cm-row-label">Rejected</div>
+            <div class="cm-cell tn">
+              <div class="cm-cell-count">7,092</div>
+              <div class="cm-cell-label">True Negative</div>
+              <div class="cm-cell-pct">98.0%</div>
+            </div>
+            <div class="cm-cell fp">
+              <div class="cm-cell-count">145</div>
+              <div class="cm-cell-label">False Positive</div>
+              <div class="cm-cell-pct">2.0%</div>
+            </div>
+          </div>
+          <div class="cm-row">
+            <div class="cm-row-label">Approved</div>
+            <div class="cm-cell fn">
+              <div class="cm-cell-count">202</div>
+              <div class="cm-cell-label">False Negative</div>
+              <div class="cm-cell-pct">7.3%</div>
+            </div>
+            <div class="cm-cell tp">
+              <div class="cm-cell-count">2,561</div>
+              <div class="cm-cell-label">True Positive</div>
+              <div class="cm-cell-pct">92.7%</div>
+            </div>
+          </div>
+          <div class="cm-predicted-label">Predicted Label</div>
+        </div>
+      </div>
+      <div class="cm-kpi-row">
+        <div class="cm-kpi">
+          <div class="cm-kpi-val" style="color:var(--green)">98%</div>
+          <div class="cm-kpi-lbl">Precision<br>Rejected</div>
+        </div>
+        <div class="cm-kpi">
+          <div class="cm-kpi-val" style="color:var(--cyan)">94%</div>
+          <div class="cm-kpi-lbl">Precision<br>Approved</div>
+        </div>
+        <div class="cm-kpi">
+          <div class="cm-kpi-val" style="color:var(--green)">98%</div>
+          <div class="cm-kpi-lbl">Recall<br>Rejected</div>
+        </div>
+        <div class="cm-kpi">
+          <div class="cm-kpi-val" style="color:var(--cyan)">94%</div>
+          <div class="cm-kpi-lbl">Recall<br>Approved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 4. FEATURE IMPORTANCES ────────────────────── -->
+  <div class="chart-card card-gold" id="card-fi">
+    <div class="card-header">
+      <div class="card-title-area">
+        <div class="card-icon card-icon-gold">🔑</div>
+        <div>
+          <div class="card-title">Feature Importances</div>
+          <div class="card-sub">Random Forest sub-model · Top 11 features</div>
+        </div>
+      </div>
+      <span class="card-badge badge-gold">#1 hard_reject_flag</span>
+    </div>
+    <div class="canvas-wrap" style="height:320px">
+      <canvas id="fiChart"></canvas>
+    </div>
+    <div class="legend-row" style="margin-top:.85rem">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span> hard_reject_flag (RBI structural)</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span> Remaining features</div>
+    </div>
+  </div>
+
+  <!-- ── 5. 5-FOLD CV ─────────────────────────────── -->
+  <div class="chart-card card-purple" id="card-cv">
+    <div class="card-header">
+      <div class="card-title-area">
+        <div class="card-icon card-icon-purple">🔁</div>
+        <div>
+          <div class="card-title">5-Fold Cross-Validation</div>
+          <div class="card-sub">Accuracy per fold · Stratified split</div>
+        </div>
+      </div>
+      <span class="card-badge badge-purple">Mean 96.41%</span>
+    </div>
+    <div class="canvas-wrap" style="height:280px">
+      <canvas id="cvChart"></canvas>
+    </div>
+    <div class="legend-row" style="margin-top:.85rem">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--purple)"></span> Per-fold accuracy</div>
+      <div class="legend-item"><span class="legend-dash" style="border-color:var(--gold)"></span> Mean 96.41%</div>
+      <div style="margin-left:auto"><span class="annotation ann-gold">σ = 0.10%</span></div>
+    </div>
+  </div>
+
+  <!-- ── 6. PER LOAN TYPE ACCURACY ────────────────── -->
+  <div class="chart-card card-red" id="card-lt">
+    <div class="card-header">
+      <div class="card-title-area">
+        <div class="card-icon card-icon-red">🏷️</div>
+        <div>
+          <div class="card-title">Accuracy by Loan Type</div>
+          <div class="card-sub">Test set · 7 RBI loan categories</div>
+        </div>
+      </div>
+      <span class="card-badge badge-red">Min 94.2%</span>
+    </div>
+    <div class="canvas-wrap" style="height:280px">
+      <canvas id="ltChart"></canvas>
+    </div>
+    <div class="legend-row" style="margin-top:.85rem">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--cyan)"></span> Loan type accuracy</div>
+      <div class="legend-item"><span class="legend-dash" style="border-color:var(--red)"></span> 96% target line</div>
+    </div>
+  </div>
+
+</div><!-- end charts-wrapper -->
+
+<!-- ═══════════════════════════════════════════
+     FOOTER
+═══════════════════════════════════════════ -->
+<div class="footer-ribbon">
+  <div class="footer-left">
+    <strong>RBI LoanSense AI</strong> · Stacking Ensemble ·
+    Field data: IOB + Union Bank of India, Nuzvid, Andhra Pradesh ·
+    LBRCE Mylavaram, 2025
+  </div>
+  <div class="footer-badges">
+    <span class="chip chip-green">96.52% Acc</span>
+    <span class="chip chip-cyan">99.56% AUC</span>
+    <span class="chip chip-gold">KS 0.87</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     CHART.JS SCRIPTS
+═══════════════════════════════════════════ -->
+<script>
+/* ─── GLOBAL CHART DEFAULTS ─── */
+Chart.defaults.color = '#6b8aaa';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 11;
+
+const GOLD   = '#f0a500';
+const CYAN   = '#00d4ff';
+const GREEN  = '#00e5a0';
+const RED    = '#ff4d6d';
+const PURPLE = '#a855f7';
+const MUTED  = '#6b8aaa';
+const PANEL  = '#0e2040';
+const BORDER = '#1a3358';
+
+function hexAlpha(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+/* ══════════════════════════════════════════════
+   CHART 1 — ROC CURVE
+══════════════════════════════════════════════ */
+(function buildROC() {
+  const fpr = [0,0.001,0.002,0.004,0.007,0.010,0.015,0.020,0.028,0.040,
+               0.060,0.085,0.120,0.170,0.240,0.340,0.460,0.590,0.720,0.840,0.940,1.0];
+  const tpr = [0,0.340,0.480,0.590,0.680,0.745,0.810,0.860,0.900,0.930,
+               0.952,0.966,0.975,0.982,0.987,0.991,0.994,0.997,0.998,0.999,0.9995,1.0];
+  const rand = fpr.map(x=>x);
+
+  new Chart(document.getElementById('rocChart'), {
+    type: 'line',
+    data: {
+      labels: fpr,
+      datasets: [
+        {
+          label: 'Stacking Ensemble',
+          data: tpr,
+          borderColor: CYAN,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.42,
+          fill: true,
+          backgroundColor: hexAlpha(CYAN, 0.08),
+          order: 1
+        },
+        {
+          label: 'Random Chance',
+          data: rand,
+          borderColor: hexAlpha(MUTED, 0.45),
+          borderWidth: 1.5,
+          borderDash: [6,4],
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          order: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1200, easing: 'easeInOutQuart' },
+      scales: {
+        x: {
+          title: { display: true, text: 'False Positive Rate', color: MUTED, font: { size: 11 } },
+          min: 0, max: 1,
+          ticks: {
+            stepSize: 0.2,
+            callback: v => (typeof v === 'number') ? v.toFixed(1) : v
+          },
+          grid: { color: hexAlpha('#1a3358', 0.8) }
+        },
+        y: {
+          title: { display: true, text: 'True Positive Rate', color: MUTED, font: { size: 11 } },
+          min: 0, max: 1.05,
+          ticks: { stepSize: 0.2 },
+          grid: { color: hexAlpha('#1a3358', 0.8) }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0b1a30',
+          borderColor: CYAN,
+          borderWidth: 1,
+          titleColor: CYAN,
+          bodyColor: '#e8eef7',
+          callbacks: {
+            title: items => `FPR: ${Number(items[0].label).toFixed(3)}`,
+            label: item => ` TPR: ${item.raw.toFixed(4)}`
+          }
+        },
+        annotation: { annotations: {} }
+      }
+    },
+    plugins: [{
+      id: 'aucLabel',
+      afterDraw(chart) {
+        const { ctx, chartArea: { left, top, right, bottom } } = chart;
+        const cx = left + (right - left) * 0.60;
+        const cy = top  + (bottom - top) * 0.55;
+        ctx.save();
+        ctx.fillStyle = hexAlpha(CYAN, 0.12);
+        ctx.strokeStyle = hexAlpha(CYAN, 0.4);
+        ctx.lineWidth = 1;
+        const w = 110, h = 24, r = 6;
+        ctx.beginPath();
+        ctx.roundRect(cx - w/2, cy - h/2, w, h, r);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = CYAN;
+        ctx.font = '700 11px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('AUC = 99.56%', cx, cy);
+        ctx.restore();
+      }
+    }]
+  });
+})();
+
+/* ══════════════════════════════════════════════
+   CHART 2 — KS CDF SEPARATION
+══════════════════════════════════════════════ */
+(function buildKS() {
+  const xs = [0,0.04,0.08,0.12,0.16,0.20,0.25,0.30,0.36,0.42,0.50,0.58,0.65,0.75,0.85,0.92,1.0];
+  // Rejected CDF — bulk of probability mass near 0
+  const rejCDF = [0,0.155,0.340,0.510,0.645,0.730,0.810,0.870,0.912,0.940,0.960,0.973,0.982,0.990,0.996,0.999,1.0];
+  // Approved CDF — bulk of probability mass near 1
+  const appCDF = [0,0.001,0.003,0.006,0.010,0.015,0.025,0.042,0.075,0.120,0.200,0.330,0.480,0.680,0.870,0.960,1.0];
+
+  // KS line data
+  const ksLineX = [0.20, 0.20];
+  const ksLineY = [appCDF[5], rejCDF[5]]; // at x=0.20
+
+  new Chart(document.getElementById('ksChart'), {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Rejected CDF',
+          data: xs.map((x,i) => ({ x, y: rejCDF[i] })),
+          borderColor: RED,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.38,
+          fill: false,
+        },
+        {
+          label: 'Approved CDF',
+          data: xs.map((x,i) => ({ x, y: appCDF[i] })),
+          borderColor: GREEN,
+          borderWidth: 2.5,
+          pointRadius: 0,
+          tension: 0.38,
+          fill: false,
+        },
+        {
+          label: 'KS Threshold',
+          data: [{ x: 0.20, y: 0 }, { x: 0.20, y: 1.0 }],
+          borderColor: GOLD,
+          borderWidth: 1.8,
+          borderDash: [5,4],
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1300, easing: 'easeInOutQuart' },
+      scales: {
+        x: {
+          type: 'linear',
+          title: { display: true, text: 'Predicted Approval Probability', color: MUTED, font: { size: 11 } },
+          min: 0, max: 1,
+          ticks: { stepSize: 0.2 },
+          grid: { color: hexAlpha('#1a3358', 0.8) }
+        },
+        y: {
+          title: { display: true, text: 'Cumulative Proportion', color: MUTED, font: { size: 11 } },
+          min: 0, max: 1.05,
+          ticks: { stepSize: 0.2 },
+          grid: { color: hexAlpha('#1a3358', 0.8) }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0b1a30',
+          borderColor: GREEN,
+          borderWidth: 1,
+          titleColor: GREEN,
+          bodyColor: '#e8eef7',
+          callbacks: {
+            title: items => `Prob: ${Number(items[0].raw.x).toFixed(2)}`,
+            label: item => ` ${item.dataset.label}: ${Number(item.raw.y).toFixed(3)}`
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'ksLabel',
+      afterDraw(chart) {
+        const { ctx, scales: { x, y } } = chart;
+        const xPx = x.getPixelForValue(0.20);
+        const y1  = y.getPixelForValue(0.015);
+        const y2  = y.getPixelForValue(0.730);
+        // Draw KS bracket
+        ctx.save();
+        ctx.strokeStyle = GOLD;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([]);
+        // left tick
+        ctx.beginPath(); ctx.moveTo(xPx - 6, y1); ctx.lineTo(xPx + 6, y1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(xPx - 6, y2); ctx.lineTo(xPx + 6, y2); ctx.stroke();
+        // vertical bar
+        ctx.beginPath(); ctx.moveTo(xPx, y1); ctx.lineTo(xPx, y2); ctx.stroke();
+
+        // KS label
+        const cx = xPx + 14;
+        const cy = (y1 + y2) / 2;
+        ctx.fillStyle = hexAlpha(GOLD, 0.14);
+        ctx.strokeStyle = hexAlpha(GOLD, 0.4);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(cx, cy - 12, 74, 24, 5);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = GOLD;
+        ctx.font = '700 11px "JetBrains Mono", monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('KS = 0.87', cx + 7, cy);
+        ctx.restore();
+      }
+    }]
+  });
+})();
+
+/* ══════════════════════════════════════════════
+   CHART 4 — FEATURE IMPORTANCES
+══════════════════════════════════════════════ */
+(function buildFI() {
+  const labels = [
+    'loan_to_income',
+    'credit_utilisation',
+    'retirement_gap',
+    'loan_per_tenure',
+    'total_obligation_ratio',
+    'cibil_score',
+    'risk_adj_income',
+    'income_emi_ratio',
+    'foir',
+    'cibil_foir_interaction',
+    'hard_reject_flag ★'
+  ];
+  const vals = [0.038, 0.043, 0.054, 0.065, 0.076, 0.087, 0.098, 0.110, 0.121, 0.138, 0.182];
+  const colors = vals.map((v,i) => i === vals.length-1 ? GOLD : hexAlpha(CYAN, 0.55 + i*0.04));
+  const border = vals.map((v,i) => i === vals.length-1 ? GOLD : hexAlpha(CYAN, 0.7));
+
+  new Chart(document.getElementById('fiChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Importance',
+        data: vals,
+        backgroundColor: colors,
+        borderColor: border,
+        borderWidth: 1.5,
+        borderRadius: 5,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1100, easing: 'easeOutQuart' },
+      scales: {
+        x: {
+          title: { display: true, text: 'Importance Score', color: MUTED, font: { size: 11 } },
+          min: 0, max: 0.22,
+          grid: { color: hexAlpha('#1a3358', 0.8) },
+          ticks: { callback: v => v.toFixed(2) }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { font: { size: 10 }, color: '#8ba5c0' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0b1a30',
+          borderColor: GOLD,
+          borderWidth: 1,
+          callbacks: {
+            title: items => items[0].label,
+            label: item => ` Importance: ${item.raw.toFixed(4)} (${(item.raw*100).toFixed(1)}%)`
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ══════════════════════════════════════════════
+   CHART 5 — 5-FOLD CROSS-VALIDATION
+══════════════════════════════════════════════ */
+(function buildCV() {
+  const folds  = ['Fold 1', 'Fold 2', 'Fold 3', 'Fold 4', 'Fold 5'];
+  const accs   = [96.28, 96.55, 96.40, 96.35, 96.48];
+  const MEAN   = 96.412;
+
+  new Chart(document.getElementById('cvChart'), {
+    type: 'bar',
+    data: {
+      labels: folds,
+      datasets: [
+        {
+          label: 'Fold Accuracy (%)',
+          data: accs,
+          backgroundColor: accs.map(v =>
+            v === Math.max(...accs) ? hexAlpha(PURPLE, 0.7) : hexAlpha(PURPLE, 0.42)
+          ),
+          borderColor: PURPLE,
+          borderWidth: 1.5,
+          borderRadius: 8,
+          borderSkipped: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1000, easing: 'easeOutBounce' },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { font: { size: 11 }, color: '#8ba5c0' }
+        },
+        y: {
+          title: { display: true, text: 'Accuracy (%)', color: MUTED, font: { size: 11 } },
+          min: 95.5, max: 97.2,
+          grid: { color: hexAlpha('#1a3358', 0.8) },
+          ticks: { callback: v => v.toFixed(1) + '%' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0b1a30',
+          borderColor: PURPLE,
+          borderWidth: 1,
+          callbacks: {
+            title: items => items[0].label,
+            label: item => ` Accuracy: ${item.raw.toFixed(2)}%`
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'meanLine',
+      afterDraw(chart) {
+        const { ctx, scales: { x, y }, chartArea } = chart;
+        const yPx = y.getPixelForValue(MEAN);
+        ctx.save();
+        ctx.strokeStyle = GOLD;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([7, 4]);
+        ctx.beginPath();
+        ctx.moveTo(chartArea.left, yPx);
+        ctx.lineTo(chartArea.right, yPx);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Label
+        ctx.fillStyle = hexAlpha(GOLD, 0.15);
+        ctx.strokeStyle = hexAlpha(GOLD, 0.45);
+        ctx.lineWidth = 1;
+        const tw = 100, th = 22;
+        ctx.beginPath();
+        ctx.roundRect(chartArea.right - tw - 4, yPx - th/2, tw, th, 5);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = GOLD;
+        ctx.font = '700 10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`Mean: ${MEAN.toFixed(2)}%`, chartArea.right - tw/2 - 4, yPx);
+        ctx.restore();
+      }
+    }]
+  });
+})();
+
+/* ══════════════════════════════════════════════
+   CHART 6 — PER LOAN TYPE ACCURACY
+══════════════════════════════════════════════ */
+(function buildLT() {
+  const types = [
+    'Gold Loan',
+    'Vehicle Loan',
+    'Personal Loan',
+    'Home Loan',
+    'Education Loan',
+    'Business Loan',
+    'Loan Against Property'
+  ];
+  const accs = [94.2, 95.8, 96.1, 96.5, 96.8, 97.1, 97.4];
+  const emojis = ['🪙','🚗','💳','🏠','🎓','🏢','📜'];
+  const colors = accs.map(v =>
+    v < 95   ? hexAlpha(RED,    0.55) :
+    v < 96   ? hexAlpha(GOLD,   0.55) :
+               hexAlpha(CYAN,   0.55)
+  );
+  const borders = accs.map(v =>
+    v < 95 ? RED : v < 96 ? GOLD : CYAN
+  );
+
+  new Chart(document.getElementById('ltChart'), {
+    type: 'bar',
+    data: {
+      labels: types,
+      datasets: [{
+        label: 'Accuracy (%)',
+        data: accs,
+        backgroundColor: colors,
+        borderColor: borders,
+        borderWidth: 1.5,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 1100, easing: 'easeOutQuart' },
+      scales: {
+        x: {
+          title: { display: true, text: 'Accuracy (%)', color: MUTED, font: { size: 11 } },
+          min: 93, max: 99,
+          grid: { color: hexAlpha('#1a3358', 0.8) },
+          ticks: { callback: v => v + '%' }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { font: { size: 11 }, color: '#8ba5c0' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0b1a30',
+          borderColor: CYAN,
+          borderWidth: 1,
+          callbacks: {
+            title: items => items[0].label,
+            label: item => ` Accuracy: ${item.raw.toFixed(1)}%`
+          }
+        }
+      }
+    },
+    plugins: [{
+      id: 'targetLine',
+      afterDraw(chart) {
+        const { ctx, scales: { x, y }, chartArea } = chart;
+        const xPx = x.getPixelForValue(96);
+        ctx.save();
+        ctx.strokeStyle = hexAlpha(RED, 0.75);
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(xPx, chartArea.top);
+        ctx.lineTo(xPx, chartArea.bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = hexAlpha(RED, 0.12);
+        ctx.strokeStyle = hexAlpha(RED, 0.4);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(xPx - 40, chartArea.top + 3, 40, 18, 4);
+        ctx.fill(); ctx.stroke();
+        ctx.fillStyle = RED;
+        ctx.font = '600 10px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('96%', xPx - 20, chartArea.top + 12);
+        ctx.restore();
+      }
+    }]
+  });
+})();
+
+/* ── Filter buttons ── */
+function highlightAll(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.chart-card').forEach(c => {
+    c.style.opacity = '1'; c.style.transform = '';
+  });
+}
+function highlightCurves(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const curves = ['card-roc', 'card-ks'];
+  document.querySelectorAll('.chart-card').forEach(c => {
+    if (curves.includes(c.id)) {
+      c.style.opacity = '1'; c.style.transform = '';
+    } else {
+      c.style.opacity = '0.35'; c.style.transform = 'scale(0.98)';
+    }
+  });
+}
+function highlightBars(btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const bars = ['card-fi', 'card-cv', 'card-lt', 'card-cm'];
+  document.querySelectorAll('.chart-card').forEach(c => {
+    if (bars.includes(c.id)) {
+      c.style.opacity = '1'; c.style.transform = '';
+    } else {
+      c.style.opacity = '0.35'; c.style.transform = 'scale(0.98)';
+    }
+  });
+}
+</script>
+</body>
+</html>

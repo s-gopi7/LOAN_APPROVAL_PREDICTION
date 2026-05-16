@@ -1,0 +1,77 @@
+# Core ML Libraries
+pandas>=1.3.0
+numpy>=1.21.0
+scikit-learn>=1.0.0
+
+# Advanced ML Models
+xgboost>=1.7.0
+lightgbm>=3.3.0
+catboost>=1.1.0
+
+# Imbalanced Data Handling
+imbalanced-learn>=0.10.0
+
+# Model Interpretation
+shap>=0.41.0
+
+# Visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+
+# Model Persistence
+joblib>=1.1.0
+
+# Progress Bars (optional but nice)
+tqdm>=4.62.0
+
+# Jupyter (for experimentation)
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# Additional utilities
+scipy>=1.7.0
+
+# ========================================
+# Optional Dependencies (for advanced features)
+# ========================================
+
+# Deep Learning (optional)
+# tensorflow>=2.8.0
+# keras>=2.8.0
+# torch>=1.10.0
+
+# Additional Interpretation Tools
+# lime>=0.2.0
+
+# Experiment Tracking
+# mlflow>=1.20.0
+# wandb>=0.12.0
+
+# Hyperparameter Optimization
+# optuna>=2.10.0
+# hyperopt>=0.2.5
+
+# Feature Selection
+# boruta>=0.3.0
+
+# Statistical Tests
+# statsmodels>=0.13.0
+
+# ========================================
+# Installation Instructions
+# ========================================
+# 
+# 1. Basic installation:
+#    pip install -r requirements.txt
+# 
+# 2. If you encounter issues with XGBoost/LightGBM/CatBoost on Windows:
+#    - Use conda: conda install -c conda-forge xgboost lightgbm
+#    - Or use pre-built wheels from: https://www.lfd.uci.edu/~gohlke/pythonlibs/
+# 
+# 3. For SHAP installation issues:
+#    pip install shap --no-build-isolation
+# 
+# 4. Create virtual environment (recommended):
+#    python -m venv ml_env
+#    source ml_env/bin/activate  # On Windows: ml_env\Scripts\activate
+#    pip install -r requirements.txt
